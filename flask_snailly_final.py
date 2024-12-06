@@ -13,7 +13,7 @@ import sys
 app = Flask(__name__)
 CORS(app)
 
-model = YOLO("D:/Codelabs/Snailly-Image/yolo_model.pt")
+model = YOLO("best.pt")
 
 
 # IMAGE FUNCTION

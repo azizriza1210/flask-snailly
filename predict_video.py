@@ -1,59 +1,18 @@
-from flask import Flask, request, jsonify
-import subprocess
-import requests
-from PIL import Image
-from io import BytesIO
 import json
-import predict_image
-import predict_video
-import httpx
-import base64
+from flask import Flask, request
 from flask_cors import CORS
 from ultralytics import YOLO
-import cv2 
+import os
 import urllib.request
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import cv2
 import multiprocessing
 import os
 import sys
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from pytube import YouTube
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
-
-app = Flask(__name__)
-CORS(app) 
 
 # VIDEO DETECTION
-def get_video_links(url):
-    """
-    Mendapatkan semua link video dari halaman web
-    """
-    try:
-        response = requests.get(url)
-        response.raise_for_status()  # Periksa apakah permintaan berhasil
-        soup = BeautifulSoup(response.content, 'html.parser')
-
-        # Cari semua tag <video> atau link dengan ekstensi video
-        video_links = []
-
-        # Cari dari tag <video> -> <source>
-        for video_tag in soup.find_all('video'):
-            for source in video_tag.find_all('source'):
-                video_src = source.get('src')
-                if video_src:
-                    video_links.append(urljoin(url, video_src))  # URL absolut
-
-        # Tambahkan link langsung ke file video (misalnya .mp4, .webm)
-        for link in soup.find_all('a', href=True):
-            if link['href'].endswith(('mp4', 'webm', 'avi', 'mov')):
-                video_links.append(urljoin(url, link['href']))  # URL absolut
-
-        return list(set(video_links))  # Hilangkan duplikat
-
-    except Exception as e:
-        print(f"Error occurred while fetching video links: {e}")
-        return []
+def download_video(url, name):
+    urllib.request.urlretrieve(url, name)
 
 def print_progress(iteration, total, prefix='', suffix='', decimals=3, bar_length=100):
     """
@@ -132,7 +91,7 @@ def extract_frames(video_path, frames_dir, overwrite=False, start=-1, end=-1, ev
     return saved_count  # and return the count of the images we saved
 
 
-def video_to_frames(video_path, frames_dir, overwrite=False, every=10, chunk_size=1000):
+def video_to_frames(video_path, frames_dir, overwrite=False, every=1, chunk_size=1000):
     """
     Extracts the frames from a video using multiprocessing
     :param video_path: path to the video
@@ -169,94 +128,10 @@ def video_to_frames(video_path, frames_dir, overwrite=False, every=10, chunk_siz
     with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
 
         futures = [executor.submit(extract_frames, video_path, frames_dir, overwrite, f[0], f[1], every)
-                   for f in frame_chunks]  # submit the processes: extract_frames(...)
+                for f in frame_chunks]  # submit the processes: extract_frames(...)
 
         for i, f in enumerate(as_completed(futures)):  # as each process completes
             print_progress(i, len(frame_chunks)-1, prefix=prefix_str, suffix='Complete')  # print it's progress
 
-    return os.path.join(frames_dir, video_filename)  # when done return the directory containing the frames# END VIDEO DETECTION
-
-@app.route('/')
-def home():
-    return "Backend Flask Snailly is running!"
-
-# Route untuk menerima data via POST
-@app.route('/link-history', methods=['POST'])
-def submit_link():
-    data = request.get_json()  # Mengambil data JSON dari body
-    url_link = data.get('url')  # Mengambil nilai 'url' dari JSON
-    log_id = data.get('log_id')
-    print(url_link)
-    print(log_id)
-
-    try:
-        subprocess.run(["python3", "real_time.py", url_link, log_id], check=True)
-    except subprocess.CalledProcessError as e:
-        return jsonify({'error': 'Failed to run other script', 'details': str(e)}), 500
-
-    return jsonify({'message': 'URL received and script executed', 'url': url_link}), 200
-
-# Route untuk menerima data via POST
-@app.route('/predict-image', methods=['POST'])
-def predict():
-    try:
-        # Mendapatkan URL gambar dari request
-        data = request.json
-        image_url = data.get('image_url')
-
-        if not image_url:
-            return jsonify({"error": "No image URL provided"}), 400
-
-
-        # Nama file untuk menyimpan gambar yang diunduh
-        filename = "downloaded_image.jpg"
-
-        # Mendownload gambar dari URL
-        urllib.request.urlretrieve(image_url, filename)
-
-        # Buka file gambar menggunakan PIL
-        try:
-            img = Image.open(filename)  # Membuka gambar yang diunduh
-        except Exception as e:
-            return jsonify({"error": f"Failed to open image: {str(e)}"}), 500
-
-        try:
-            # Simpan gambar sementara di server
-            img_path = "temp_image.jpg"
-            img.save(img_path)  # Menyimpan gambar sebagai file sementara
-            print(f"Gambar sementara disimpan di: {img_path}")
-            prediction = predict_image.predict_image(filename)
-
-            print(json.dumps({"prediction": prediction}))
-        #     prediction_output = json.loads(result.stdout)  # Parsing output JSON dari subprocess
-        except json.JSONDecodeError:
-            return jsonify({"error": "Failed to parse prediction result"}), 500
-        
-        # Kembalikan hasil prediksi
-        return jsonify({"hasil": prediction})
-
-    except Exception as e:
-        print("INI ERROR : ",e)
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/video-prediction',methods=['POST'])
-def video_prediction():
-    data = request.json
-    url = data.get('url')
-    name = "video.mp4"
-    try:
-        print("Downloading starts...\n")
-        # Contoh penggunaan
-        print("INI URL: ", url)
-        # download_video(url)
-        print("Download completed..!!")
-
-        video_to_frames(video_path="video1.mp4", frames_dir='D:/Codelabs/Flask-Snailly/test_frames', overwrite=False, every=10, chunk_size=1000)
-    except Exception as e:
-        print(e)
-    
-    return "DONE"
-
-# Menjalankan aplikasi
-if __name__ == '__main__':
-    app.run(debug=True, port=4638)
+    return os.path.join(frames_dir, video_filename)  # when done return the directory containing the frames
+# END VIDEO DETECTION

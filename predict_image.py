@@ -9,7 +9,7 @@ import json
 from ultralytics import YOLO
 import os
 
-model = YOLO("yolo_model.pt")
+model = YOLO("best.pt")
 
 def save_image(file):
     filename = file.filename
@@ -22,9 +22,23 @@ def predict_image_yolo(filepath):
     return results
 
 def get_label(results):
-    top_result = results[0].probs.top1  # Mendapatkan indeks label dengan probabilitas tertinggi
-    names = results[0].names
-    class_name = names.get(top_result, 'Unknown')  # 'Unknown' jika key tidak ada
+    # Mendapatkan hasil probabilitas tertinggi
+    top_result = results[0].probs.top1  # Indeks label dengan probabilitas tertinggi
+    names = results[0].names  # Daftar nama label
+    top_result_5 = results[0].probs.top5conf  # Indeks label dengan probabilitas tertinggi
+    # Mengambil nilai tertinggi
+    max_value = top_result_5.max().item()  # .item() digunakan untuk mendapatkan nilai sebagai angka Python
+    print("Nilai tertinggi:", max_value)
+
+    # Mendapatkan nama label dan probabilitas
+    class_name = names.get(top_result, 'Unknown')
+    # print("INI PROBS : ",top_result)
+    # prob_top = probs[top_result] * 100  # Konversi probabilitas ke persentase
+
+    # # Logika khusus untuk label 'np'
+    if class_name == "np" and 0.5 <= max_value <= 0.6:
+        class_name = "porn"  # Ubah menjadi porn jika prob di antara 50% - 60%
+
     return class_name
 
 
