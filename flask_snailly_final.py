@@ -160,6 +160,11 @@ def video_to_frames(video_path, frames_dir, overwrite=False, every=1, chunk_size
     return os.path.join(frames_dir, video_filename)  # when done return the directory containing the frames
 # END VIDEO DETECTION
 
+@app.route('/')
+def home():
+    halo_web = "HALLLOOOO!!!!"
+    return halo_web
+
 @app.route('/image-prediction',methods=['POST'])
 def image_prediction():
     file = request.files.get('file')
