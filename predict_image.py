@@ -5,11 +5,11 @@ import sys
 from io import BytesIO
 import requests
 import tempfile
-import json  
+import json
 from ultralytics import YOLO
 import os
 
-model = YOLO("best.pt")
+model = YOLO("/home/snailly/mysite/flask-snailly/best (2).pt")
 
 def save_image(file):
     filename = file.filename
@@ -36,7 +36,7 @@ def get_label(results):
     # prob_top = probs[top_result] * 100  # Konversi probabilitas ke persentase
 
     # # Logika khusus untuk label 'np'
-    if class_name == "np" and 0.5 <= max_value <= 0.6:
+    if class_name == "np" and 0.5 <= max_value <= 0.7:
         class_name = "porn"  # Ubah menjadi porn jika prob di antara 50% - 60%
 
     return class_name
@@ -57,7 +57,7 @@ def download_image(url):
         img = Image.open(BytesIO(response.content))
         return img
     except requests.exceptions.RequestException as e:
-        print(json.dumps({"error": str(e)}))  
+        print(json.dumps({"error": str(e)}))
         sys.exit(1)
 
 if __name__ == "__main__":
